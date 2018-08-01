@@ -3,8 +3,7 @@ kind: Ingress
 metadata:
   name: tls-ingress
   annotations:
-    kubernetes.io/ingress.class: nginx
-    certmanager.k8s.io/cluster-issuer: letsencrypt-prod
+    kubernetes.io/tls-acme: "true"
     nginx.ingress.kubernetes.io/rewrite-target: /
 spec:
   tls:
@@ -15,40 +14,14 @@ spec:
   - host: <YOUR_DNS_NAME>.<YOUR_AZURE_REGION>.cloudapp.azure.com
     http:
       paths:
-      - path: /
+      - path: /v1/
         backend:
           serviceName: api-v1-cluster
           servicePort: 80
----
-apiVersion: certmanager.k8s.io/v1alpha1
-kind: Certificate
-metadata:
-  name: tls-secret
-spec:
-  secretName: tls-secret
-  dnsNames:
-  - <YOUR_DNS_NAME>.<YOUR_AZURE_REGION>.cloudapp.azure.com
-  acme:
-    config:
-    - http01:
-        ingressClass: nginx
-      domains:
-      - <YOUR_DNS_NAME>.<YOUR_AZURE_REGION>.cloudapp.azure.com
-  issuerRef:
-    name: letsencrypt-prod
-    kind: ClusterIssuer
----    
-apiVersion: certmanager.k8s.io/v1alpha1
-kind: ClusterIssuer
-metadata:
-  name: letsencrypt-prod
-spec:
-  acme:
-    server: https://acme-v02.api.letsencrypt.org/directory
-    email: <YOUR_EMAIL>
-    privateKeySecretRef:
-      name: letsencrypt-prod
-    http01: {}
+      - path: /v2/
+        backend:
+          serviceName: api-v2-cluster
+          servicePort: 80
 ---
 apiVersion: v1
 kind: Service
@@ -73,8 +46,39 @@ spec:
         app: api-v1
     spec:
       containers:
-      - name: api-example
+      - name: api-example-1
         image: jamesadarich/api-example:v1.0.0
+        ports:
+        - containerPort: 80
+        env:
+        - name: PORT
+          value: "80"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-v2-cluster
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+  selector:
+    app: api-v2
+---
+apiVersion: apps/v1beta1
+kind: Deployment
+metadata:
+  name: api-v2
+spec:
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: api-v2
+    spec:
+      containers:
+      - name: api-example-2
+        image: jamesadarich/api-example:v2.0.0
         ports:
         - containerPort: 80
         env:
