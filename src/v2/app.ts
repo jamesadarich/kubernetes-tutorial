@@ -1,11 +1,10 @@
 import * as express from "express";
-import fetch from "node-fetch";
+import { getAllDevelopers } from "../data-access/get-all-developers";
 
 const app = express();
 
 app.get("/developers/:team", async (request, response) => {
-    const devResponse = await fetch(`http://${process.env.DATA_ACCESS_SERVICE_HOST}/developers`);
-    const allDevelopers = await devResponse.json();
+    const allDevelopers = getAllDevelopers();
     const teamDevelopers = allDevelopers.filter((d: { team: string }) => d.team === "All" 
                                                   || d.team === request.params.team);
     response.send(teamDevelopers);

@@ -1,5 +1,6 @@
-docker build . -f src/v1/dockerfile -t jamesadarich/api-example:v1
 # AKS easy as ABC
+
+Everyone is talking about Kubernetes and now Microsoft have released their offering (AKS - Azure Kubernetes Service) let's give it a whirl!
 
 ## Prerequisites
 
@@ -26,16 +27,21 @@ If you have multiple subscriptions you will need to ensure that you are working 
 az account show
 ```
 
-If you want to switch it simply find 
+If you want to switch it simply find the subscription you need via
 
 ```cli
 az account list
+```
+
+Then select it using
+
+```cli
 az account set -s <SUBSCRIPTION_ID>
 ```
 
 ## Register some providers
 
-AKS is in preview so may need some first steps
+AKS requires a few extra bits of azure goodness simply run these commands to make sure you've got all the required dependencies.
 
 ```cli
 az provider register -n Microsoft.Network
@@ -46,9 +52,13 @@ az provider register -n Microsoft.ContainerService
 
 ## Let's get creative
 
+Now we're ready to set up an AKS instance, first we need a resource group...
+
 ```cli
 az group create --name <RG-NAME> --location <RG-LOCATION>
 ```
+
+... then we can create the instance itself. It's important to note that as of writing this article it is not possible to change vm size so please make sure you set it to something that is going to work for your application
 
 ```cli
 az aks create --resource-group <RG_NAME> --node-vm-size <VM-SIZE> --name <CLUSTER_NAME> --node-count <NODE_COUNT> --generate-ssh-keys
@@ -56,23 +66,40 @@ az aks create --resource-group <RG_NAME> --node-vm-size <VM-SIZE> --name <CLUSTE
 
 ## Install some helpful tools
 
+Next we need some tools to help us set up our application.
+
 ```cli
 az aks install-cli
 ```
 
-CHECK WHAT IS INSTALLED VIA THIS SEEMS LIKE NOT EVERYONE GOT THEM
+The above command will set up 
 
 ### kubectl
 
 ### helm
 
+
 ## Time to get Kubery
+
+Now we've got all are tools in place we can get to work, first we'll need to get some credentials so we can connect to our AKS instance
 
 ```cli
 az aks get-credentials --resource-group <RG_NAME> --name <CLUSTER_NAME>
 ```
 
-# Ingress. Service, Deployment
+then we need to initialise helm on our AKS instance [WHAT IS GOING ON HERE WITH ACCOUNT ETC.]
+
+```cli
+helm init (--upgrade --service-account default)
+```
+
+finally we update helm's repo so we can use some awesome up to date charts
+
+```cli
+helm repo update
+```
+
+## Ingress. Service, Deployment
 
 ```cli
 kubectl create -f infrastructure/kubernetes.yaml
@@ -80,30 +107,28 @@ kubectl create -f infrastructure/kubernetes.yaml
 
 ## TLS (convert to cert-manager)
 
-helm init (--upgrade --service-account default)
-
-helm repo update
-
-helm install stable/nginx-ingress --namespace kube-system --set rbac.create=false --set rbac.createRole=false --set rbac.createClusterRole=false
+```cli
+helm install stable/nginx-ingress --namespace kube-system --set rbac.create=false
+```
 
 Grab the IP
 
-kubectl get service -l app=nginx-ingress --namespace kube-system
-
 ```cli
-az network public-ip list --query "[?ipAddress!=null]|[?contains(ipAddress, '<IP_ADDRESS>')].[resourceGroup, name]" --output tsv
+kubectl get service -l app=nginx-ingress --namespace kube-system
 ```
 
-az network public-ip update --resource-group <RESOURCE_GROUP> --name <IP_NAME> --dns-name <DNS_PREFIX>
+```cli
+az network public-ip list --query "[?ipAddress!=null]|[?contains(ipAddress, '<IP_ADDRESS>')].[id]" --output tsv
+```
 
-# TLS
-
-RBAC rules apply to this too! (--set rbac.create=false --set rbac.createRole=false --set rbac.createClusterRole=false)
-
-helm install stable/cert-manager --set ingressShim.defaultIssuerName=letsencrypt-prod --set ingressShim.defaultIssuerKind=ClusterIssuer 
+```cli
+az network public-ip update --ids <IP_ID> --dns-name <DNS_PREFIX>
+```
 
 ## Version the API
 
 ## Tidying it up
 
+```cli
 az group delete --name <RESOURCE_GROUP> --yes --no-wait
+```
